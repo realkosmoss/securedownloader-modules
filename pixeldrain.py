@@ -1,43 +1,6 @@
 from curl_cffi import requests
 import json, re
 
-# OLD pixeldrain code saved for meming purposes
-#def pixeldrain_fetch(session: requests.Session, url: str) -> list[str]:
-#    url_lower = url.lower()
-#    if "pixeldrain.com/l/" in url_lower: # album
-#        resp = session.get(url)
-#        data = None
-#        for line in resp.text.splitlines():
-#            if line.strip().startswith("window.viewer_data ="):
-#                data_str = line.strip().replace("window.viewer_data =", "").rstrip(";").strip()
-#                data = json.loads(data_str)
-#                break
-#
-#        if data and data["type"].lower() == "list":
-#            files = data.get("api_response", {}).get("files", [])
-#            fileIds = []
-#            directLinks = []
-#            for file in files:
-#                fileId = file["detail_href"].replace("/file/", "").replace("/info", "")
-#                fileIds.append(fileId)
-#            for fileId in fileIds:
-#                resp = session.get(f"https://pixeldrain.com/u/{fileId}")
-#                # Handle videos (Commented it out as it MIGHT download an lower quality version.)
-#                #soup = BeautifulSoup(resp.text, 'html.parser')
-#                #meta_tag = soup.find('meta', property='og:video')
-#                #if meta_tag:
-#                #    download_url = meta_tag.get("content")
-#                #    if download_url:
-#                #        directLinks.append(download_url)
-#                #        continue
-#                # if not a video then well.. fuck.. (Suprisingly easy.)
-#                directLinks.append(f"https://pixeldrain.com/api/file/{fileId}?download")
-#                continue
-#            return directLinks
-#    elif "pixeldrain.com/u/" in url_lower: # Single file
-#        fileId = url.replace("pixeldrain.com/u/", "").replace("http://", "").replace("https://", "").replace("/", "").strip()
-#        return f"https://pixeldrain.com/api/file/{fileId}?download"
-
 api_cors = {
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
@@ -75,4 +38,5 @@ def pixeldrain_fetch(session: requests.Session, url: str):
     elif "/u/" in ul:
         file_id = url.replace("http://", "https://").replace(".dev", ".com").replace("https://pixeldrain.com/u/", "").split("/")[0]
         return f"https://pixeldrain.com/api/file/{file_id}?download"
+
     raise Exception("[pixeldrain] Everything failed? What the fuck did you pass into me?")
