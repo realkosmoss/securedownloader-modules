@@ -4,8 +4,7 @@ import base64
 import re
 
 def mediafire_fetch(session: requests.Session, url: str) -> str | None:
-    """Returns mediafire link."""
-    if not "mediafire.com/folder/" in url.lower(): # if its not a folder
+    if not "/folder/" in url.lower(): # if its not a folder
         url_fix = url.replace("http://", "https://")
         resp = session.get(url_fix) # fixes some rare issues if you enter a http url
         resp.raise_for_status()
@@ -27,8 +26,7 @@ def mediafire_fetch(session: requests.Session, url: str) -> str | None:
             return href
 
         return None
-
-    else:
+    else: # Gr8 handling mate
         match = re.search(r"/folder/([^/]+)", url)
         download_links = []
         if match:
