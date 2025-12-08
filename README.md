@@ -1,6 +1,6 @@
 # securedownloader-modules
 
-these are all the modules from my private tool
+these are (some) the modules from my private tool
 
 no docs  
 no support  
