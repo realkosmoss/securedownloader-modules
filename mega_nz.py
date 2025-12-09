@@ -214,7 +214,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     max_chunk = 120 * 1024 * 1024
     curr_chunk = initial_chunk
 
-    save_prefix = 0
+    save_prefix = 1
     save_path = os.path.join(os.getcwd(), filename)
     offset = 0
 
@@ -247,7 +247,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     bytes_downloaded = offset
     start = time.time()
     last_line_len = 0
-    THREADS = 12#9
+    THREADS = 12 # 12 is the sweet spot for 500 Mbps
 
     # Shitty fucking printer thread because the printing logic inside of the downloading worker slowed speeds horrendously
     stopthefuckingprintthread = threading.Event()
