@@ -247,7 +247,34 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     bytes_downloaded = offset
     start = time.time()
     last_line_len = 0
-    THREADS = 6#9
+    THREADS = 12#9
+
+    # Shitty fucking printer thread because the printing logic inside of the downloading worker slowed speeds horrendously
+    stopthefuckingprintthread = threading.Event()
+    def progress_thread():
+        nonlocal last_line_len
+        while not stopthefuckingprintthread.is_set():
+            with progress_lock:
+                bd = bytes_downloaded
+
+            elapsed = max(time.time() - start, 1e-6)
+            speed_bps = bd / elapsed
+            speed_mbps = (speed_bps * 8) / (1024*1024)
+            percent = bd / size * 100
+            remaining = max(size - bd, 0)
+            eta = remaining / speed_bps if speed_bps > 0 else None
+
+            line = (f"Downloaded {_human_bytes(bd)} / {_human_bytes(size)} "
+                    f"({percent:5.1f}%) — {speed_mbps:5.2f} Mbps — ETA {_human_time(eta)}")
+            pad = " " * max(0, last_line_len - len(line))
+            print("\r" + line + pad, end="", flush=True)
+            last_line_len = len(line)
+
+            if bd >= size: # Stop if download is complete yes very nice
+                stopthefuckingprintthread.set()
+                break
+            time.sleep(0.1)
+    threading.Thread(target=progress_thread, daemon=True).start() # start it yes
 
     our_session_proxies = our_session.proxies
 
@@ -314,6 +341,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     q.join()
     for _ in threads:
         q.put(None)
+    stopthefuckingprintthread.set() # stops printing thread
 
     end = time.time()
     total_bytes = os.path.getsize(save_path)
