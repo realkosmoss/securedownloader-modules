@@ -182,8 +182,7 @@ def _mega_nz_folder(session: requests.Session, url: str):
         filename = attrs["n"]
         size = dl_node["s"]
         dl_url = dl_node["g"]
-
-        print(f"Downloading {filename}...")
+        
         _download(session, dl_url, size, filename, file_key_aes, file_iv)
         
 def _mega_nz_single(session: requests.Session, url: str):
@@ -244,6 +243,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     q = Queue()
     file_lock = threading.Lock()
     progress_lock = threading.Lock()
+    start_progress = threading.Event()
 
     bytes_downloaded = offset
     start = time.time()
@@ -323,7 +323,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
 
     final = (f"Downloaded {_human_bytes(total_bytes)} in {_human_time(elapsed)} "
              f"({speed_mbps:.2f} Mbps) -> {save_path}")
-    print("\r" + " " * last_line_len + "\r" + final, end="", flush=True)
+    print("\r" + final + " " * (last_line_len - len(final)))
 
 def mega_nz_download(session: requests.Session, url: str):
     url_lower = url.lower()
