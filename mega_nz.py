@@ -1,6 +1,8 @@
 from curl_cffi import requests
 import base64, json, os, time
 from Crypto.Cipher import AES
+import threading
+from queue import Queue
 
 # Unrelated to mega but its the download printing logic
 def _human_bytes(n):
@@ -238,54 +240,86 @@ def _download(dl_url, size, filename, file_key_aes, file_key_iv):
             offset = 0
             break
 
-    dl_session = requests.Session() # Mega doesnt allow fingerprinted requests for downloads
-    start = time.time() # For sexy printing
-    last_line_len = 0 # This too ^^
-    bytes_downloaded = offset # This too ^^
-    while offset < size:
-        chunk_size = min(curr_chunk, size - offset)
+    # prepare threading
+    q = Queue()
+    file_lock = threading.Lock()
+    progress_lock = threading.Lock()
 
-        end = offset + chunk_size - 1
-        headers = {'Range': f'bytes={offset}-{end}'}
-        resp = dl_session.get(dl_url, headers=headers) # could be sped up by threading
-        resp.raise_for_status()
-        chunk_enc = resp.content
+    bytes_downloaded = offset
+    start = time.time()
+    last_line_len = 0
+    THREADS = 6#9
 
-        chunk = decrypt_chunk(chunk_enc, file_key_aes, file_key_iv, offset)
+    def worker():
+        nonlocal bytes_downloaded, last_line_len
+        dl_session = requests.Session()  # Mega doesnt allow fingerprinted requests for downloads
 
-        with open(save_path, "r+b") as f:
-            f.seek(offset)
-            f.write(chunk)
-            f.flush()
+        while True:
+            item = q.get()
+            if item is None:
+                return
 
-        offset += chunk_size
+            task_offset, task_size = item
+            end = task_offset + task_size - 1
+
+            headers = {'Range': f'bytes={task_offset}-{end}'}
+            resp = dl_session.get(dl_url, headers=headers)
+            resp.raise_for_status()
+            chunk_enc = resp.content
+
+            chunk = decrypt_chunk(chunk_enc, file_key_aes, file_key_iv, task_offset)
+
+            with file_lock:
+                with open(save_path, "r+b") as f:
+                    f.seek(task_offset)
+                    f.write(chunk)
+                    f.flush()
+
+            with progress_lock:
+                bytes_downloaded += len(chunk)
+
+                elapsed = time.time() - start
+                elapsed = max(elapsed, 1e-6)
+                speed_bps = bytes_downloaded / elapsed
+                speed_mbps = (speed_bps * 8) / (1024 * 1024)
+
+                percent = bytes_downloaded / size * 100
+                remaining = max(size - bytes_downloaded, 0)
+                eta = remaining / speed_bps if speed_bps > 0 else None
+                total_str = _human_bytes(size)
+
+                line = (f"Downloaded {_human_bytes(bytes_downloaded)} / {total_str} ({percent:5.1f}%) — {speed_mbps:5.2f} Mbps — ETA {_human_time(eta)}")
+                pad = " " * max(0, last_line_len - len(line))
+                print("\r" + line + pad, end="", flush=True)
+                last_line_len = len(line)
+
+            q.task_done()
+
+    threads = []
+    for _ in range(THREADS):
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        threads.append(t)
+
+    current = offset
+    while current < size:
+        chunk_size = min(curr_chunk, size - current)
+        q.put((current, chunk_size))
+        current += chunk_size
         if curr_chunk < max_chunk:
             curr_chunk = min(curr_chunk + initial_chunk, max_chunk)
 
-        # print sexily
-        bytes_downloaded += len(chunk)
+    q.join()
+    for _ in threads:
+        q.put(None)
 
-        elapsed = time.time() - start
-        elapsed = max(elapsed, 1e-6)
-        speed_bps = bytes_downloaded / elapsed
-        speed_mbps = (speed_bps * 8) / (1024 * 1024)
-
-        percent = bytes_downloaded / size * 100
-        remaining = max(size - bytes_downloaded, 0)
-        eta = remaining / (speed_bps) if speed_bps > 0 else None
-        total_str = _human_bytes(size)
-        line = (f"Downloaded {_human_bytes(bytes_downloaded)} / {total_str} ({percent:5.1f}%) — {speed_mbps:5.2f} Mbps — ETA {_human_time(eta)}")
-        pad = " " * max(0, last_line_len - len(line))
-        print("\r" + line + pad, end="", flush=True)
-        last_line_len = len(line)
-    # more printing bullshit
     end = time.time()
     total_bytes = os.path.getsize(save_path)
-    elapsed = end - start
-    elapsed = max(elapsed, 1e-6)
+    elapsed = max(end - start, 1e-6)
     speed_mbps = (total_bytes * 8) / (elapsed * 1024 * 1024)
 
-    final = (f"Downloaded {_human_bytes(total_bytes)} in {_human_time(elapsed)} ({speed_mbps:.2f} Mbps) -> {save_path}")
+    final = (f"Downloaded {_human_bytes(total_bytes)} in {_human_time(elapsed)} "
+             f"({speed_mbps:.2f} Mbps) -> {save_path}")
     print("\r" + " " * last_line_len + "\r" + final, end="", flush=True)
 
 def mega_nz_download(session: requests.Session, url: str):
