@@ -170,7 +170,7 @@ def _mega_nz_folder(session: requests.Session, url: str):
                 )
             except:
                 pass
-            if resp.status_code == 200:
+            if dl_resp.status_code == 200:
                 break
         dl_node = dl_resp.json()[0]
 
