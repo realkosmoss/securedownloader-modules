@@ -4,7 +4,7 @@ def rutube_ru_fetch(session: requests.Session, url: str):
     resp = session.get(url)
     if not resp.status_code == 200:
         raise Exception("[RuTube] Failed Session.get line 6, ", url)
-    video_id = url.replace("http://", "").replace("https://", "").replace("rutube.ru/video/", "").split()[0]
+    video_id = url.replace("http://", "").replace("https://", "").replace("rutube.ru/video/", "").split("/")[0]
     api_url = f"https://rutube.ru/api/play/options/{video_id}/?no_404=true&referer=https%253A%252F%252Frutube.ru&pver=v2&client=wdp&2k=1&av1=1"
     resp = session.get(api_url)
     if not resp.status_code == 200:
@@ -19,4 +19,5 @@ def rutube_ru_fetch(session: requests.Session, url: str):
     elif DL_LINK:
         return DL_LINK, video_name
     else:
+
         raise Exception("[RuTube] No download link found.")
