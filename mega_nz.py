@@ -243,7 +243,6 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     q = Queue()
     file_lock = threading.Lock()
     progress_lock = threading.Lock()
-    start_progress = threading.Event()
 
     bytes_downloaded = offset
     start = time.time()
