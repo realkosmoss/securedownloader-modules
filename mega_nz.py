@@ -126,7 +126,7 @@ def _mega_nz_folder(session: requests.Session, url: str):
         try:
             resp = _api_post(
                 session,
-                f"https://g.api.mega.co.nz/cs?id={rid}&n={folder_id}",
+                f"https://{host}.api.mega.co.nz/cs?id={rid}&n={folder_id}",
                 json=api_data,
             )
         except:
