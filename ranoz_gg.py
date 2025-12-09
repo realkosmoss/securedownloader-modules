@@ -1,4 +1,3 @@
-from patchright.sync_api import sync_playwright
 from curl_cffi import requests
 import re
 
@@ -41,5 +40,6 @@ def ranoz_gg_fetch(session: requests.Session, url: str) -> str:
             session.get(fake_link)
         except:
             pass
+
 
     return real_link
