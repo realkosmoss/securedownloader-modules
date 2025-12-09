@@ -184,7 +184,7 @@ def _mega_nz_folder(session: requests.Session, url: str):
         dl_url = dl_node["g"]
 
         print(f"Downloading {filename}...")
-        _download(dl_url, size, filename, file_key_aes, file_iv)
+        _download(session, dl_url, size, filename, file_key_aes, file_iv)
         
 def _mega_nz_single(session: requests.Session, url: str):
     file_id, file_key = extract_url_keys(url)
@@ -207,9 +207,9 @@ def _mega_nz_single(session: requests.Session, url: str):
     filename = attrs["n"]
     size = node["s"]
     dl_url = node["g"]
-    _download(dl_url, size, filename, file_key_aes, file_key_iv)
+    _download(session, dl_url, size, filename, file_key_aes, file_key_iv)
 
-def _download(dl_url, size, filename, file_key_aes, file_key_iv):
+def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     # prepare for download
     initial_chunk = 128 * 1024
     max_chunk = 120 * 1024 * 1024
@@ -250,9 +250,12 @@ def _download(dl_url, size, filename, file_key_aes, file_key_iv):
     last_line_len = 0
     THREADS = 6#9
 
+    our_session_proxies = our_session.proxies
+
     def worker():
         nonlocal bytes_downloaded, last_line_len
         dl_session = requests.Session()  # Mega doesnt allow fingerprinted requests for downloads
+        dl_session.proxies = our_session_proxies
 
         while True:
             item = q.get()
