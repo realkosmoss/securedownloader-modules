@@ -7,11 +7,6 @@ _api_headers = {
    "sec-fetch-mode": "cors",
    "sec-fetch-site": "same-origin",
 }
-_normal_headers = {
-   "sec-fetch-dest": "document",
-   "sec-fetch-mode": "navigate",
-   "sec-fetch-site": "none",
-}
 
 def rootz_so_fetch(session: requests.Session, url: str):
     if not "/d/" in url:
@@ -48,4 +43,5 @@ def rootz_so_fetch(session: requests.Session, url: str):
     # End of tracking
 
     resp = session.get(f"https://www.rootz.so/api/files/proxy-download/{fileId}", allow_redirects=False)
+
     return resp.headers.get("location") or fileUrl, fileName
