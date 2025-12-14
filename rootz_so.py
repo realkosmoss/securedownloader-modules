@@ -43,5 +43,4 @@ def rootz_so_fetch(session: requests.Session, url: str):
     # End of tracking
 
     resp = session.get(f"https://www.rootz.so/api/files/proxy-download/{fileId}", allow_redirects=False)
-
     return resp.headers.get("location") or fileUrl, fileName
