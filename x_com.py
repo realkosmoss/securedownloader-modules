@@ -2,6 +2,16 @@ from curl_cffi import requests
 from bs4 import BeautifulSoup
 import json, re
 
+def _fxtwitter_fallback(session: requests.Session, url: str): # until i find a way to get nsfw shit from guest + better than nothing at all
+    fx_url = url.replace("//x.com", "//api.fxtwitter.com")
+    resp = session.get(fx_url)
+    if not resp.status_code == 200:
+        raise Exception("[X.COM] FxTwitter returned", resp.status_code)
+    data = resp.json()
+    tweet = data["tweet"]
+    all_media = [media["url"] for media in tweet["media"]["all"]]
+    return all_media
+
 def x_com_fetch(session: requests.Session, url: str):
     TweetIdMatch = re.search(r'/[^/]+/status/(\d+)', url)
     if not TweetIdMatch:
@@ -113,7 +123,10 @@ def x_com_fetch(session: requests.Session, url: str):
     if not data:
         raise Exception(f"[X.COM] GraphQL response missing 'data': {resp.text}")
     if "Age-restricted adult content. This content might not be appropriate for people under 18 years old. To view this media, you’ll need to log in to X. Learn more" in resp.text:
-        raise Exception("[X.COM] Age-restricted. This content might not be appropriate for people under 18 years old.")
+        #raise Exception("[X.COM] Age-restricted. This content might not be appropriate for people under 18 years old.")
+        # Fallback to fxtwitter API im not going to fight twitters auth only nsfw bullshit
+        # https://github.com/FxEmbed/FxEmbed/wiki/Status-Fetch-API
+        return _fxtwitter_fallback(session, url)
     
     SCRAPED_LINKS = []
 
