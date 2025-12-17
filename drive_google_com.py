@@ -79,6 +79,13 @@ def drive_google_com_fetch(session: requests.Session, url: str):
         session.headers["referer"] = "https://drive.google.com/"
         resp = session.get(downloadUrl)
         data = resp.json()
+        if "error" in data:
+            err = data["error"]
+            code = err.get("code")
+            message = err.get("message", "Unknown Drive error")
+            if code == 429:
+                raise Exception("[Drive] The limit has been hit for viewers who aren't signed in.")
+            raise Exception(f"[Drive] API error {code}: {message}")
         streams = data["mediaStreamingData"]["formatStreamingData"]["progressiveTranscodes"]
         best_url = _pick_best(streams)
         return best_url, filename + ("" if filename.endswith(".mp4") else ".mp4")
