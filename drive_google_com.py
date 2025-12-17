@@ -34,16 +34,19 @@ def drive_google_com_fetch(session: requests.Session, url: str):
     m = re.search(r'/d/([A-Za-z0-9_-]+)/view(?:\?.*)?', url)
     file_id = m.group(1) if m else None
 
+    filename = file_id or "drive_download"
+
     filenameMatch = re.search(r"<title>(.*?) - Google Drive</title>", resp.text)
     if filenameMatch:
         filename = filenameMatch.group(1)
-
+        
+    KEY = None
     configJsonMatch = re.search(r"configJson:\s*(\[[\s\S]*?\])", resp.text)
     if configJsonMatch:
         configJsonStr = configJsonMatch.group(1)
         configJsonStr = configJsonStr.replace("undefined", "null")
         configJsonStr = re.sub(r",\s*(\]|\})", r"\1", configJsonStr)
-        keyMatch = re.search(r'https://clients6\.google\.com",null,"(AIza[0-9A-Za-z\-_]{35})"', configJsonStr)
+        keyMatch = re.search(r'https://clients\d+\.google\.com",null,"(AIza[0-9A-Za-z\-_]{35})"', configJsonStr)
         if keyMatch:
             KEY = keyMatch.group(1)
     # <----> (End of backup)
@@ -57,19 +60,18 @@ def drive_google_com_fetch(session: requests.Session, url: str):
     itemJsonStr = re.sub(r",\s*(\]|\})", r"\1", itemJsonStr)
 
     itemJson = json.loads(itemJsonStr)
-    downloadUrl = None
+    downloadUrl, resource_key = None, None
     for bs in itemJson:
         if not bs:
             continue
         if "&export=download" in str(bs):
             downloadUrl = bs
-            break
-    resource_key = None
-    for bs in itemJson: # Yes it does loop over again, but its because we might not even need this at all for some downloads, its better to handle it in here instead
         if isinstance(bs, list):
             for sub in bs:
                 if isinstance(sub, list) and len(sub) > 1:
                     _, resource_key = sub[:2]
+        if downloadUrl and resource_key: # yes if only downloadUrl is found then it will loop through the full one anyways then break, still faster than 2 loops
+            break
     if not downloadUrl: # We try extracting the VIDEO url if its a video (This is the backup)
         if not KEY:
             raise Exception("[Drive.google.com] Failed, both normal and backup. (No configJson or Key)")
