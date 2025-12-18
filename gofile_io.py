@@ -20,7 +20,7 @@ def gofile_io_fetch(session: requests.Session, url: str):
     _AppdataMatch = re.search(r'appdata\.wt\s*=\s*([\'"])(.*?)\1', resp.text)
     if not _AppdataMatch:
         raise Exception("[GOFILE] Appdata WT not found")
-    AppdataMT = _AppdataMatch.group(2)
+    AppdataWT = _AppdataMatch.group(2)
 
     _temp_api_headers = {**session.headers, **_api_cors}
     # Get account
@@ -49,7 +49,7 @@ def gofile_io_fetch(session: requests.Session, url: str):
     except: pass
 
     # downloading shit now
-    _temp_api_headers.update({"authorization": f"Bearer {account_token}", "x-website-token": AppdataMT})
+    _temp_api_headers.update({"authorization": f"Bearer {account_token}", "x-website-token": AppdataWT})
     resp = session.get(f"https://api.gofile.io/contents/{fileId}?contentFilter=&page=1&pageSize=1000&sortField=name&sortDirection=1", headers=_temp_api_headers)
     _data = resp.json()
     _status = _data.get("status")
