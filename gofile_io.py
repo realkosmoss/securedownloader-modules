@@ -31,6 +31,8 @@ def gofile_io_fetch(session: requests.Session, url: str):
         raise Exception("[GOFILE] content api returned some weird shit")
     api_data = api_resp.json()
     account_token = api_data.get("data").get("token")
+    # Set the cookie for downloading with this session later, if you do that in your backend that is
+    session.cookies.update({"accountToken": account_token})
 
     # tracking lalala
     _temp_data = {
