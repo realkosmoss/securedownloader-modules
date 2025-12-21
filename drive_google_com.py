@@ -60,6 +60,7 @@ def drive_google_com_fetch(session: requests.Session, url: str):
     itemJsonStr = re.sub(r",\s*(\]|\})", r"\1", itemJsonStr)
 
     itemJson = json.loads(itemJsonStr)
+
     downloadUrl, resource_key = None, None
     for bs in itemJson:
         if not bs:
@@ -94,7 +95,7 @@ def drive_google_com_fetch(session: requests.Session, url: str):
 
     form = soup.find('form', {'id': 'download-form'})
     if not form:
-        raise ValueError("Download form not found")
+        return f"https://drive.usercontent.google.com/download?id={file_id}&export=download" # cool
 
     action_url = form.get('action')
     inputs = form.find_all('input', {'type': 'hidden'})
