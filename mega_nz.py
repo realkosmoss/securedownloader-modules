@@ -41,6 +41,50 @@ def _api_post(session: requests.Session, url: str, *args, **kwargs):
     headers = {**session.headers, **api_cors}
     return session.post(url, *args, headers=headers, **kwargs)
 
+# Download helpers
+def _build_mega_chunks(
+    filesize: int,
+    start_offset: int,
+    threads: int,
+    max_chunk: int
+):
+    chunks = []
+    p = start_offset
+
+    if p == 0:
+        for i in range(1, 9):
+            size_i = i * 128 * 1024
+            if p >= filesize - size_i:
+                break
+            chunks.append((p, size_i))
+            p += size_i
+
+    MIN_CHUNK = 1 * 1024 * 1024  # 1 MiB
+
+    steady = filesize / threads / 2
+
+    if steady > max_chunk:
+        steady = max_chunk
+    elif steady <= MIN_CHUNK:
+        steady = MIN_CHUNK
+    else:
+        steady = (steady // MIN_CHUNK) * MIN_CHUNK
+
+    steady = int(steady)
+
+    while p < filesize:
+        # Math.floor((filesize - p) / 1048576 + 1) * 1048576
+        length = ((filesize - p) // MIN_CHUNK + 1) * MIN_CHUNK
+
+        if length > steady:
+            length = steady
+
+        real_len = min(length, filesize - p)
+        chunks.append((p, real_len))
+        p += length
+
+    return chunks
+
 # Decryption helpers
 def extract_url_keys(url: str):
     base, key = url.split('#', 1)
@@ -209,19 +253,16 @@ def _mega_nz_single(session: requests.Session, url: str):
     _download(session, dl_url, size, filename, file_key_aes, file_key_iv)
 
 def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
-    # prepare for download
-    initial_chunk = 128 * 1024
-    max_chunk = 120 * 1024 * 1024
-    curr_chunk = initial_chunk
+    max_chunk = 16 * 1048576
 
     save_prefix = 1
     save_path = os.path.join(os.getcwd(), filename)
     offset = 0
 
     while True: 
-        # Checks if the file is already there, 
-        # if is and its not the size of the mega file, 
-        # it will start downloading the needed chunks to complete it, 
+        # Checks if the file is already there,
+        # if is and its not the size of the mega file,
+        # it will start downloading the needed chunks to complete it,
         # and checks if its already downloaded and adds prefix so it doesnt replace anything
         if os.path.exists(save_path):
             tmp_offset = os.path.getsize(save_path)
@@ -247,7 +288,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     bytes_downloaded = offset
     start = time.time()
     last_line_len = 0
-    THREADS = 12 # 12 is the sweet spot for 500 Mbps
+    THREADS = 6 # 12 is the sweet spot for 500 Mbps
 
     # Shitty fucking printer thread because the printing logic inside of the downloading worker slowed speeds horrendously
     stopthefuckingprintthread = threading.Event()
@@ -292,8 +333,21 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
             end = task_offset + task_size - 1
 
             headers = {'Range': f'bytes={task_offset}-{end}'}
-            resp = dl_session.get(dl_url, headers=headers)
-            resp.raise_for_status()
+            MAX_RETRIES = 5
+
+            for attempt in range(MAX_RETRIES):
+                try:
+                    resp = dl_session.get(
+                        dl_url,
+                        headers=headers,
+                        timeout=(10, 300)
+                    )
+                    resp.raise_for_status()
+                    break
+                except Exception:
+                    if attempt == MAX_RETRIES - 1:
+                        raise
+                    time.sleep(1.5 * (attempt + 1))
             chunk_enc = resp.content
 
             chunk = decrypt_chunk(chunk_enc, file_key_aes, file_key_iv, task_offset)
@@ -330,13 +384,15 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
         t.start()
         threads.append(t)
 
-    current = offset
-    while current < size:
-        chunk_size = min(curr_chunk, size - current)
-        q.put((current, chunk_size))
-        current += chunk_size
-        if curr_chunk < max_chunk:
-            curr_chunk = min(curr_chunk + initial_chunk, max_chunk)
+    chunks = _build_mega_chunks(
+        filesize=size,
+        start_offset=offset,
+        threads=THREADS,
+        max_chunk=max_chunk
+    )
+
+    for off, sz in chunks:
+        q.put((off, sz))
 
     q.join()
     for _ in threads:
