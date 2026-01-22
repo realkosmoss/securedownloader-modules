@@ -1,9 +1,17 @@
 from curl_cffi import requests
-from bs4 import BeautifulSoup
+import re
 
 def filemirage_com_fetch(session: requests.Session, url: str):
     resp = session.get(url)
-    soup = BeautifulSoup(resp.text, "html.parser")
 
-    link_tag = soup.find("a", class_="btn btn-action", attrs={"aria-label": "Download"})
-    return link_tag["href"] if link_tag else None
+    pattern = r'window\.location\.href\s*=\s*"([^"]*/file/direct[^"]*)"'
+
+    match = re.search(pattern, resp.text)
+    if not match:
+        raise Exception("[filemirage] Couldnt find the direct link")
+    _url = match.group(1)
+
+    _resp = session.get(_url, allow_redirects=False)
+    _direct_link = _resp.headers.get("location")
+
+    return _direct_link
