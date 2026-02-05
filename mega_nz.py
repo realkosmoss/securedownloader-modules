@@ -90,8 +90,12 @@ def extract_url_keys(url: str):
     base, key = url.split('#', 1)
     file_id = base.rstrip('/').split('/')[-1]
     key = key.replace('-', '+').replace('_', '/')
+    key = key.split('/file/')[0]
     key += '=' * (-len(key) % 4)
-    return file_id, key
+    folder_file_id = None
+    if '/file/' in url:
+        folder_file_id = url.split('/file/')[-1]
+    return file_id, key, folder_file_id
 
 def derive_keys(b64_key):
     key_bytes = base64.b64decode(b64_key)
@@ -159,7 +163,7 @@ def decrypt_chunk(chunk_enc, aes_key, iv, task_offset):
 api_hosts = ['g', 'eu', 'us', 'asia']
 
 def _mega_nz_folder(session: requests.Session, url: str):
-    folder_id, folder_key_b64 = extract_url_keys(url)
+    folder_id, folder_key_b64, folder_file_id = extract_url_keys(url)
 
     folder_key_raw = base64.b64decode(folder_key_b64)
     shared_key_a32 = _bytes_to_a32(folder_key_raw)
@@ -184,6 +188,8 @@ def _mega_nz_folder(session: requests.Session, url: str):
             continue
 
         file_id = node["h"]
+        if folder_file_id and folder_file_id != file_id:
+            continue
         enc_key_b64 = node["k"].split(":")[1]
 
         key_words = _decrypt_node_key(enc_key_b64, shared_key_a32)
@@ -288,7 +294,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
     bytes_downloaded = offset
     start = time.time()
     last_line_len = 0
-    THREADS = 6 # 12 is the sweet spot for 500 Mbps
+    THREADS = 3 # 12 is the sweet spot for 500 Mbps
 
     # Shitty fucking printer thread because the printing logic inside of the downloading worker slowed speeds horrendously
     stopthefuckingprintthread = threading.Event()
@@ -315,14 +321,14 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
                 stopthefuckingprintthread.set()
                 break
             time.sleep(0.1)
+            
     threading.Thread(target=progress_thread, daemon=True).start() # start it yes
-
-    our_session_proxies = our_session.proxies
 
     def worker():
         nonlocal bytes_downloaded, last_line_len
+
         dl_session = requests.Session()  # Mega doesnt allow fingerprinted requests for downloads
-        dl_session.proxies = our_session_proxies
+        dl_session.proxies = our_session.proxies
 
         while True:
             item = q.get()
@@ -333,7 +339,7 @@ def _download(our_session, dl_url, size, filename, file_key_aes, file_key_iv):
             end = task_offset + task_size - 1
 
             headers = {'Range': f'bytes={task_offset}-{end}'}
-            MAX_RETRIES = 5
+            MAX_RETRIES = 10
 
             for attempt in range(MAX_RETRIES):
                 try:
