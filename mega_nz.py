@@ -236,7 +236,7 @@ def _mega_nz_folder(session: requests.Session, url: str):
         _download(session, dl_url, size, filename, file_key_aes, file_iv)
         
 def _mega_nz_single(session: requests.Session, url: str):
-    file_id, file_key = extract_url_keys(url)
+    file_id, file_key, _ = extract_url_keys(url)
     file_key_aes, file_key_iv = derive_keys(file_key)
 
     api_data = [{
