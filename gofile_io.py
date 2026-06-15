@@ -14,7 +14,7 @@ def generateWT(token: str, user_agent: str, language: str) -> str:
     now_seconds = time.time()
     time_chunk = math.floor(now_seconds / 14400)
     
-    raw_string = f"{user_agent}::{language}::{token}::{time_chunk}::5d4f7g8sd45fsd"
+    raw_string = f"{user_agent}::{language}::{token}::{time_chunk}::9844d94d963d30"
     
     return hashlib.sha256(raw_string.encode('utf-8')).hexdigest()
 
